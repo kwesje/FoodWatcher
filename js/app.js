@@ -53,7 +53,8 @@ function renderCycleSetupForm(isReset) {
     const [year, month, day] = dateInput.value.split("-").map(Number);
     if (!year || !month || !day) return;
     setCycleStart(new Date(year, month - 1, day));
-    render();
+    app.innerHTML = "";
+    renderToday();
   });
 
   wrapper.appendChild(form);
@@ -61,24 +62,62 @@ function renderCycleSetupForm(isReset) {
 }
 
 function renderMealCard(type, meal) {
-  const card = el("div", { class: "meal-card" });
-  card.appendChild(el("div", { class: "meal-type" }, MEAL_LABELS[type]));
-
   if (type === "snack") {
+    const card = el("div", { class: "meal-card" });
+    card.appendChild(el("div", { class: "meal-type" }, MEAL_LABELS[type]));
     card.appendChild(el("div", { class: "meal-name" }, meal));
     return card;
   }
 
   if (meal === null) {
+    const card = el("div", { class: "meal-card" });
+    card.appendChild(el("div", { class: "meal-type" }, MEAL_LABELS[type]));
     card.appendChild(el("div", { class: "meal-name" }, "Leftovers / vrije keuze"));
     card.appendChild(el("div", { class: "meal-macros" }, "Flexibel: restjes, uit eten of iets uit de koelkast."));
     return card;
   }
 
   const recipe = RECIPES[meal];
+  const card = el("a", { class: "meal-card", href: `#/recipe/${meal}` });
+  card.appendChild(el("div", { class: "meal-type" }, MEAL_LABELS[type]));
   card.appendChild(el("div", { class: "meal-name" }, recipe.name));
   card.appendChild(el("div", { class: "meal-macros" }, `±${recipe.kcal} kcal | ±${recipe.protein} g eiwit`));
   return card;
+}
+
+function renderRecipeView(slug) {
+  const recipe = RECIPES[slug];
+
+  if (!recipe) {
+    return el("div", { class: "empty-state" }, [
+      el("p", {}, "Recept niet gevonden."),
+      el("a", { class: "back-link", href: "#/" }, "← Terug naar vandaag"),
+    ]);
+  }
+
+  const container = el("div", { class: "recipe-view" });
+
+  container.appendChild(el("a", { class: "back-link", href: "#/" }, "← Terug naar vandaag"));
+  container.appendChild(el("h2", { class: "recipe-title" }, recipe.name));
+  container.appendChild(
+    el("p", { class: "recipe-meta" },
+      `Voor: ${recipe.servings} ${recipe.servings === 1 ? "persoon" : "personen"} · ±${recipe.kcal} kcal | ±${recipe.protein} g eiwit per portie`)
+  );
+
+  container.appendChild(el("h3", {}, "Ingrediënten"));
+  const ingredientsList = el("ul", { class: "ingredient-list" });
+  recipe.ingredients.forEach((ingredient) => ingredientsList.appendChild(el("li", {}, ingredient)));
+  container.appendChild(ingredientsList);
+
+  container.appendChild(el("h3", {}, "Bereiding"));
+  const stepsList = el("ol", { class: "step-list" });
+  recipe.steps.forEach((step) => stepsList.appendChild(el("li", {}, step)));
+  container.appendChild(stepsList);
+
+  container.appendChild(el("h3", {}, "Bewaren/mealprep"));
+  container.appendChild(el("p", { class: "recipe-storage" }, recipe.storage));
+
+  return container;
 }
 
 function renderDayView(info) {
@@ -109,9 +148,7 @@ function renderDayView(info) {
   return container;
 }
 
-function render() {
-  app.innerHTML = "";
-
+function renderToday() {
   const info = getMenuInfoForDate();
 
   if (!info) {
@@ -129,4 +166,20 @@ function render() {
   });
 }
 
-render();
+function router() {
+  app.innerHTML = "";
+  window.scrollTo(0, 0);
+
+  const hash = location.hash;
+  const recipeMatch = hash.match(/^#\/recipe\/(.+)$/);
+
+  if (recipeMatch) {
+    app.appendChild(renderRecipeView(decodeURIComponent(recipeMatch[1])));
+    return;
+  }
+
+  renderToday();
+}
+
+window.addEventListener("hashchange", router);
+router();
