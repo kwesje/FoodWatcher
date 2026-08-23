@@ -1,4 +1,12 @@
 import { RECIPES, SHOPPING_LISTS } from "./data.js";
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {
+      // Offline-ondersteuning is een extra; de app blijft werken zonder.
+    });
+  });
+}
 import { getCycleStart, setCycleStart, CYCLE_LENGTH } from "./cycle.js";
 import { getMenuInfoForDate } from "./menu.js";
 import { dateKey, isMealChecked, toggleMealChecked } from "./checkoff.js";
