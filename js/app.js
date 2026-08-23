@@ -1,4 +1,5 @@
-import { RECIPES, SHOPPING_LISTS } from "./data.js";
+import { RECIPES } from "./data.js";
+import { getWeeklyShoppingList } from "./weeklyShopping.js";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -10,7 +11,7 @@ if ("serviceWorker" in navigator) {
 import { getCycleStart, setCycleStart, CYCLE_LENGTH } from "./cycle.js";
 import { getMenuInfoForDate } from "./menu.js";
 import { dateKey, isMealChecked, toggleMealChecked } from "./checkoff.js";
-import { itemId, isItemChecked, toggleItemChecked } from "./shopping.js";
+import { isItemChecked, toggleItemChecked } from "./shopping.js";
 
 const app = document.getElementById("app");
 const cycleStatus = document.getElementById("cycle-status");
@@ -173,7 +174,7 @@ function renderRecipeView(slug) {
 
   container.appendChild(el("h3", {}, "Ingrediënten"));
   const ingredientsList = el("ul", { class: "ingredient-list" });
-  recipe.ingredients.forEach((ingredient) => ingredientsList.appendChild(el("li", {}, ingredient)));
+  recipe.ingredients.forEach((ingredient) => ingredientsList.appendChild(el("li", {}, ingredient.display)));
   container.appendChild(ingredientsList);
 
   container.appendChild(el("h3", {}, "Bereiding"));
@@ -234,25 +235,33 @@ function renderDayView(info, viewedDate) {
   return container;
 }
 
-function renderShoppingItem(weekNumber, category, item) {
-  const id = itemId(category, item);
-  const checked = isItemChecked(weekNumber, id);
+function formatQty(qty, unit) {
+  if (unit === "g" && qty >= 1000) {
+    const kg = qty / 1000;
+    return `±${kg % 1 === 0 ? kg : kg.toFixed(1)} kg`;
+  }
+  return `±${qty} ${unit}`;
+}
+
+function renderShoppingItem(weekNumber, item) {
+  const checked = isItemChecked(weekNumber, item.key);
+  const label = item.qty ? `${item.label} — ${formatQty(item.qty, item.unit)}` : item.label;
 
   const li = el("li", { class: "shopping-item" + (checked ? " is-checked" : "") });
   const checkBtn = el(
     "button",
-    { type: "button", class: "meal-check" + (checked ? " is-checked" : ""), "aria-label": `${item} afvinken` },
+    { type: "button", class: "meal-check" + (checked ? " is-checked" : ""), "aria-label": `${item.label} afvinken` },
     checked ? "✓" : ""
   );
   checkBtn.addEventListener("click", () => {
-    const nowChecked = toggleItemChecked(weekNumber, id);
+    const nowChecked = toggleItemChecked(weekNumber, item.key);
     li.classList.toggle("is-checked", nowChecked);
     checkBtn.classList.toggle("is-checked", nowChecked);
     checkBtn.textContent = nowChecked ? "✓" : "";
   });
 
   li.appendChild(checkBtn);
-  li.appendChild(el("span", {}, item));
+  li.appendChild(el("span", {}, label));
   return li;
 }
 
@@ -267,20 +276,36 @@ function renderShoppingView() {
   }
 
   const weekNumber = info.weekNumber;
-  const list = SHOPPING_LISTS[weekNumber];
+  const { quantified, seasoning } = getWeeklyShoppingList(info.week);
   const container = el("div", { class: "shopping-view" });
 
   container.appendChild(el("h2", {}, `Boodschappenlijst — Week ${weekNumber}`));
   container.appendChild(el("p", { class: "shopping-sub" }, info.week.phase));
 
-  Object.entries(list).forEach(([category, items]) => {
+  const byCategory = new Map();
+  quantified.forEach((item) => {
+    if (!byCategory.has(item.category)) byCategory.set(item.category, []);
+    byCategory.get(item.category).push(item);
+  });
+
+  byCategory.forEach((items, category) => {
     const section = el("div", { class: "shopping-category" });
     section.appendChild(el("h3", {}, category));
     const ul = el("ul", { class: "shopping-items" });
-    items.forEach((item) => ul.appendChild(renderShoppingItem(weekNumber, category, item)));
+    items.forEach((item) => ul.appendChild(renderShoppingItem(weekNumber, item)));
     section.appendChild(ul);
     container.appendChild(section);
   });
+
+  if (seasoning.length) {
+    const section = el("div", { class: "shopping-category" });
+    section.appendChild(el("h3", {}, "Kruiden & aromaten"));
+    section.appendChild(el("p", { class: "shopping-sub" }, "Check of je deze nog in huis hebt (geen exacte hoeveelheid nodig)."));
+    const ul = el("ul", { class: "shopping-items" });
+    seasoning.forEach((item) => ul.appendChild(renderShoppingItem(weekNumber, item)));
+    section.appendChild(ul);
+    container.appendChild(section);
+  }
 
   return container;
 }

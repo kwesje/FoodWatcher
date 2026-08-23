@@ -17,10 +17,6 @@ function getAll() {
   return getItem(KEY, {});
 }
 
-export function itemId(category, item) {
-  return `${category}::${item}`;
-}
-
 export function isItemChecked(weekNumber, id) {
   const all = getAll();
   const key = listKey(weekNumber);
