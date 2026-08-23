@@ -1,7 +1,8 @@
-import { RECIPES } from "./data.js";
+import { RECIPES, SHOPPING_LISTS } from "./data.js";
 import { getCycleStart, setCycleStart, CYCLE_LENGTH } from "./cycle.js";
 import { getMenuInfoForDate } from "./menu.js";
 import { dateKey, isMealChecked, toggleMealChecked } from "./checkoff.js";
+import { itemId, isItemChecked, toggleItemChecked } from "./shopping.js";
 
 const app = document.getElementById("app");
 const cycleStatus = document.getElementById("cycle-status");
@@ -181,6 +182,57 @@ function renderDayView(info) {
   return container;
 }
 
+function renderShoppingItem(weekNumber, category, item) {
+  const id = itemId(category, item);
+  const checked = isItemChecked(weekNumber, id);
+
+  const li = el("li", { class: "shopping-item" + (checked ? " is-checked" : "") });
+  const checkBtn = el(
+    "button",
+    { type: "button", class: "meal-check" + (checked ? " is-checked" : ""), "aria-label": `${item} afvinken` },
+    checked ? "✓" : ""
+  );
+  checkBtn.addEventListener("click", () => {
+    const nowChecked = toggleItemChecked(weekNumber, id);
+    li.classList.toggle("is-checked", nowChecked);
+    checkBtn.classList.toggle("is-checked", nowChecked);
+    checkBtn.textContent = nowChecked ? "✓" : "";
+  });
+
+  li.appendChild(checkBtn);
+  li.appendChild(el("span", {}, item));
+  return li;
+}
+
+function renderShoppingView() {
+  const info = getMenuInfoForDate();
+
+  if (!info) {
+    return el("div", { class: "empty-state" }, [
+      el("p", {}, "Stel eerst je cyclus-startdatum in bij 'Vandaag' om de boodschappenlijst te zien."),
+      el("a", { class: "back-link", href: "#/" }, "← Naar Vandaag"),
+    ]);
+  }
+
+  const weekNumber = info.weekNumber;
+  const list = SHOPPING_LISTS[weekNumber];
+  const container = el("div", { class: "shopping-view" });
+
+  container.appendChild(el("h2", {}, `Boodschappenlijst — Week ${weekNumber}`));
+  container.appendChild(el("p", { class: "shopping-sub" }, info.week.phase));
+
+  Object.entries(list).forEach(([category, items]) => {
+    const section = el("div", { class: "shopping-category" });
+    section.appendChild(el("h3", {}, category));
+    const ul = el("ul", { class: "shopping-items" });
+    items.forEach((item) => ul.appendChild(renderShoppingItem(weekNumber, category, item)));
+    section.appendChild(ul);
+    container.appendChild(section);
+  });
+
+  return container;
+}
+
 function renderToday() {
   const info = getMenuInfoForDate();
 
@@ -199,15 +251,27 @@ function renderToday() {
   });
 }
 
+const navToday = document.getElementById("nav-today");
+const navShopping = document.getElementById("nav-shopping");
+
 function router() {
   app.innerHTML = "";
   window.scrollTo(0, 0);
 
   const hash = location.hash;
   const recipeMatch = hash.match(/^#\/recipe\/(.+)$/);
+  const isShopping = hash === "#/shopping";
+
+  navToday.classList.toggle("active", !isShopping);
+  navShopping.classList.toggle("active", isShopping);
 
   if (recipeMatch) {
     app.appendChild(renderRecipeView(decodeURIComponent(recipeMatch[1])));
+    return;
+  }
+
+  if (isShopping) {
+    app.appendChild(renderShoppingView());
     return;
   }
 
