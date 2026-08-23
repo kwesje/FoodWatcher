@@ -45,6 +45,13 @@ function el(tag, attrs = {}, children = []) {
   return node;
 }
 
+function submitLabelForValue(value) {
+  if (value === todayISO()) return "Mijn menstruatie is vandaag gestart";
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return "Startdatum instellen";
+  return `Mijn menstruatie is gestart op ${formatDateDutch(new Date(year, month - 1, day))}`;
+}
+
 function renderCycleSetupForm(isReset) {
   const wrapper = el("section", { class: "cycle-setup" }, [
     el("p", {}, isReset
@@ -54,9 +61,13 @@ function renderCycleSetupForm(isReset) {
 
   const form = el("form");
   const dateInput = el("input", { type: "date", id: "cycle-start-input", value: todayISO() });
-  const submit = el("button", { type: "submit" }, "Mijn menstruatie is vandaag gestart");
+  const submit = el("button", { type: "submit" }, submitLabelForValue(dateInput.value));
   form.appendChild(dateInput);
   form.appendChild(submit);
+
+  dateInput.addEventListener("input", () => {
+    submit.textContent = submitLabelForValue(dateInput.value);
+  });
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
