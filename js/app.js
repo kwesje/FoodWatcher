@@ -1,6 +1,7 @@
 import { RECIPES } from "./data.js";
 import { getCycleStart, setCycleStart, CYCLE_LENGTH } from "./cycle.js";
 import { getMenuInfoForDate } from "./menu.js";
+import { dateKey, isMealChecked, toggleMealChecked } from "./checkoff.js";
 
 const app = document.getElementById("app");
 const cycleStatus = document.getElementById("cycle-status");
@@ -61,27 +62,58 @@ function renderCycleSetupForm(isReset) {
   return wrapper;
 }
 
-function renderMealCard(type, meal) {
+function renderMealBody(type, meal) {
   if (type === "snack") {
-    const card = el("div", { class: "meal-card" });
-    card.appendChild(el("div", { class: "meal-type" }, MEAL_LABELS[type]));
-    card.appendChild(el("div", { class: "meal-name" }, meal));
-    return card;
+    return el("div", {}, [
+      el("div", { class: "meal-type" }, MEAL_LABELS[type]),
+      el("div", { class: "meal-name" }, meal),
+    ]);
   }
 
   if (meal === null) {
-    const card = el("div", { class: "meal-card" });
-    card.appendChild(el("div", { class: "meal-type" }, MEAL_LABELS[type]));
-    card.appendChild(el("div", { class: "meal-name" }, "Leftovers / vrije keuze"));
-    card.appendChild(el("div", { class: "meal-macros" }, "Flexibel: restjes, uit eten of iets uit de koelkast."));
-    return card;
+    return el("div", {}, [
+      el("div", { class: "meal-type" }, MEAL_LABELS[type]),
+      el("div", { class: "meal-name" }, "Leftovers / vrije keuze"),
+      el("div", { class: "meal-macros" }, "Flexibel: restjes, uit eten of iets uit de koelkast."),
+    ]);
   }
 
   const recipe = RECIPES[meal];
-  const card = el("a", { class: "meal-card", href: `#/recipe/${meal}` });
-  card.appendChild(el("div", { class: "meal-type" }, MEAL_LABELS[type]));
-  card.appendChild(el("div", { class: "meal-name" }, recipe.name));
-  card.appendChild(el("div", { class: "meal-macros" }, `±${recipe.kcal} kcal | ±${recipe.protein} g eiwit`));
+  return el("a", { href: `#/recipe/${meal}` }, [
+    el("div", { class: "meal-type" }, MEAL_LABELS[type]),
+    el("div", { class: "meal-name" }, recipe.name),
+    el("div", { class: "meal-macros" }, `±${recipe.kcal} kcal | ±${recipe.protein} g eiwit`),
+  ]);
+}
+
+function renderMealCard(type, meal, key) {
+  const checked = isMealChecked(key, type);
+
+  const card = el("div", { class: "meal-card" + (checked ? " is-checked" : "") });
+  const row = el("div", { class: "meal-card-row" });
+
+  const checkBtn = el(
+    "button",
+    {
+      type: "button",
+      class: "meal-check" + (checked ? " is-checked" : ""),
+      "aria-label": `${MEAL_LABELS[type]} afvinken`,
+    },
+    checked ? "✓" : ""
+  );
+
+  checkBtn.addEventListener("click", () => {
+    const nowChecked = toggleMealChecked(key, type);
+    card.classList.toggle("is-checked", nowChecked);
+    checkBtn.classList.toggle("is-checked", nowChecked);
+    checkBtn.textContent = nowChecked ? "✓" : "";
+  });
+
+  const body = el("div", { class: "meal-body" }, renderMealBody(type, meal));
+
+  row.appendChild(checkBtn);
+  row.appendChild(body);
+  card.appendChild(row);
   return card;
 }
 
@@ -132,11 +164,12 @@ function renderDayView(info) {
     ])
   );
 
+  const key = dateKey();
   const mealList = el("div", { class: "meal-list" });
-  mealList.appendChild(renderMealCard("ontbijt", info.day.ontbijt));
-  mealList.appendChild(renderMealCard("lunch", info.day.lunch));
-  mealList.appendChild(renderMealCard("snack", info.day.snack));
-  mealList.appendChild(renderMealCard("diner", info.day.diner));
+  mealList.appendChild(renderMealCard("ontbijt", info.day.ontbijt, key));
+  mealList.appendChild(renderMealCard("lunch", info.day.lunch, key));
+  mealList.appendChild(renderMealCard("snack", info.day.snack, key));
+  mealList.appendChild(renderMealCard("diner", info.day.diner, key));
   container.appendChild(mealList);
 
   const resetRow = el("div", { class: "cycle-reset" }, [
