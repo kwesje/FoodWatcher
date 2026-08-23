@@ -1,4 +1,4 @@
-const CACHE_NAME = "foodwatcher-v1";
+const CACHE_NAME = "foodwatcher-v2";
 
 const APP_SHELL = [
   "./",
@@ -32,24 +32,22 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Stale-while-revalidate: toon direct de gecachete versie (werkt offline),
-// ververs de cache op de achtergrond zodra er netwerk is.
+// Network-first: probeer altijd de nieuwste versie op te halen zodat een
+// nieuwe deploy direct zichtbaar is (sw.js zelf verandert vaak niet tussen
+// deploys, dus de browser detecteert anders nooit dat er een update is).
+// De cache dient alleen als offline-fallback wanneer er geen netwerk is.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const networkFetch = fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-
-      return cached || networkFetch;
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
