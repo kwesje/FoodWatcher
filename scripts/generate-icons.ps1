@@ -7,7 +7,7 @@ $root = Resolve-Path "$PSScriptRoot\.."
 $iconsDir = Join-Path $root "icons"
 if (-not (Test-Path $iconsDir)) { New-Item -ItemType Directory -Path $iconsDir | Out-Null }
 
-$bgColor = [System.Drawing.Color]::FromArgb(255, 0x3f, 0x6b, 0x4f)
+$bgColor = [System.Drawing.Color]::FromArgb(255, 0xe0, 0x32, 0x7d)
 $textColor = [System.Drawing.Color]::White
 
 function New-Icon {

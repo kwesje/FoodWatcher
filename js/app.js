@@ -15,6 +15,14 @@ import { itemId, isItemChecked, toggleItemChecked } from "./shopping.js";
 const app = document.getElementById("app");
 const cycleStatus = document.getElementById("cycle-status");
 
+let dayOffset = 0;
+
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
 const MEAL_LABELS = {
   ontbijt: "Ontbijt",
   lunch: "Lunch",
@@ -30,6 +38,13 @@ function todayISO() {
 
 function formatDateDutch(date) {
   return date.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function formatDayLabel(date, offset) {
+  if (offset === 0) return "Vandaag";
+  if (offset === -1) return "Gisteren";
+  if (offset === 1) return "Morgen";
+  return date.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
 }
 
 function el(tag, attrs = {}, children = []) {
@@ -172,19 +187,37 @@ function renderRecipeView(slug) {
   return container;
 }
 
-function renderDayView(info) {
+function renderDayView(info, viewedDate) {
   cycleStatus.textContent = `${info.week.phase} · Week ${info.weekNumber} · Dag ${info.cycleDay}/${CYCLE_LENGTH}`;
 
   const container = el("div");
 
+  const dayLabel = formatDayLabel(viewedDate, dayOffset);
+  const rangeText =
+    dayOffset === 0
+      ? `${info.week.cyclusRange} · vandaag is cyclusdag ${info.cycleDay}`
+      : `${info.week.cyclusRange} · cyclusdag ${info.cycleDay}`;
+
+  const labelWrap = el("div", { class: "day-nav-label" }, [dayLabel]);
+  if (dayOffset !== 0) {
+    labelWrap.appendChild(el("button", { class: "day-nav-today", type: "button", id: "day-today" }, "vandaag"));
+  }
+
+  const dayNav = el("div", { class: "day-nav" }, [
+    el("button", { class: "day-nav-btn", type: "button", id: "day-prev", "aria-label": "Vorige dag" }, "←"),
+    labelWrap,
+    el("button", { class: "day-nav-btn", type: "button", id: "day-next", "aria-label": "Volgende dag" }, "→"),
+  ]);
+  container.appendChild(dayNav);
+
   container.appendChild(
     el("div", { class: "day-header" }, [
       el("div", { class: "phase" }, info.week.phase),
-      el("div", { class: "range" }, `${info.week.cyclusRange} · vandaag is cyclusdag ${info.cycleDay}`),
+      el("div", { class: "range" }, rangeText),
     ])
   );
 
-  const key = dateKey();
+  const key = dateKey(viewedDate);
   const mealList = el("div", { class: "meal-list" });
   mealList.appendChild(renderMealCard("ontbijt", info.day.ontbijt, key));
   mealList.appendChild(renderMealCard("lunch", info.day.lunch, key));
@@ -253,7 +286,8 @@ function renderShoppingView() {
 }
 
 function renderToday() {
-  const info = getMenuInfoForDate();
+  const viewedDate = addDays(new Date(), dayOffset);
+  const info = getMenuInfoForDate(viewedDate);
 
   if (!info) {
     cycleStatus.textContent = "Cyclus nog niet ingesteld";
@@ -261,17 +295,31 @@ function renderToday() {
     return;
   }
 
-  app.appendChild(renderDayView(info));
+  app.appendChild(renderDayView(info, viewedDate));
 
   const resetBtn = document.getElementById("reset-cycle-btn");
   resetBtn.addEventListener("click", () => {
     app.innerHTML = "";
     app.appendChild(renderCycleSetupForm(true));
   });
+
+  const goToDay = (newOffset) => {
+    dayOffset = newOffset;
+    app.innerHTML = "";
+    renderToday();
+  };
+
+  document.getElementById("day-prev").addEventListener("click", () => goToDay(dayOffset - 1));
+  document.getElementById("day-next").addEventListener("click", () => goToDay(dayOffset + 1));
+  const todayBtn = document.getElementById("day-today");
+  if (todayBtn) todayBtn.addEventListener("click", () => goToDay(0));
 }
 
 const navToday = document.getElementById("nav-today");
 const navShopping = document.getElementById("nav-shopping");
+navToday.addEventListener("click", () => {
+  dayOffset = 0;
+});
 
 function router() {
   app.innerHTML = "";
