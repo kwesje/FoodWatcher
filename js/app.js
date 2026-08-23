@@ -11,6 +11,7 @@ if ("serviceWorker" in navigator) {
 import { getCycleStart, setCycleStart, CYCLE_LENGTH } from "./cycle.js";
 import { getMenuInfoForDate } from "./menu.js";
 import { dateKey, isMealChecked, toggleMealChecked } from "./checkoff.js";
+import { getSwapSourceIndex, setSwapSourceIndex } from "./swaps.js";
 import { isItemChecked, toggleItemChecked } from "./shopping.js";
 
 const app = document.getElementById("app");
@@ -122,7 +123,40 @@ function renderMealBody(type, meal) {
   ]);
 }
 
-function renderMealCard(type, meal, key) {
+function getSwapOptions(week, type) {
+  const seen = new Map(); // optionKey (slug or "__leftovers__") -> eerste dagindex
+  week.days.forEach((day, idx) => {
+    const value = day[type];
+    const optionKey = value === null ? "__leftovers__" : value;
+    if (!seen.has(optionKey)) seen.set(optionKey, idx);
+  });
+  return seen;
+}
+
+function renderSwapPicker(weekNumber, week, dayIndex, type) {
+  const options = getSwapOptions(week, type);
+  if (options.size < 2) return null;
+
+  const currentSource = getSwapSourceIndex(weekNumber, type, dayIndex);
+
+  const select = el("select", { class: "swap-select", "aria-label": `${MEAL_LABELS[type]} wisselen` });
+  options.forEach((optionDayIndex, optionKey) => {
+    const label = optionKey === "__leftovers__" ? "Leftovers / vrije keuze" : RECIPES[optionKey].name;
+    const opt = el("option", { value: String(optionDayIndex) }, label);
+    if (optionDayIndex === currentSource) opt.setAttribute("selected", "selected");
+    select.appendChild(opt);
+  });
+
+  select.addEventListener("change", () => {
+    setSwapSourceIndex(weekNumber, type, dayIndex, Number(select.value));
+    app.innerHTML = "";
+    renderToday();
+  });
+
+  return el("div", { class: "swap-row" }, [el("span", { class: "swap-label" }, "Wissel: "), select]);
+}
+
+function renderMealCard(type, meal, key, swapPicker) {
   const checked = isMealChecked(key, type);
 
   const card = el("div", { class: "meal-card" + (checked ? " is-checked" : "") });
@@ -150,6 +184,7 @@ function renderMealCard(type, meal, key) {
   row.appendChild(checkBtn);
   row.appendChild(body);
   card.appendChild(row);
+  if (swapPicker) card.appendChild(swapPicker);
   return card;
 }
 
@@ -220,10 +255,16 @@ function renderDayView(info, viewedDate) {
 
   const key = dateKey(viewedDate);
   const mealList = el("div", { class: "meal-list" });
-  mealList.appendChild(renderMealCard("ontbijt", info.day.ontbijt, key));
-  mealList.appendChild(renderMealCard("lunch", info.day.lunch, key));
-  mealList.appendChild(renderMealCard("snack", info.day.snack, key));
-  mealList.appendChild(renderMealCard("diner", info.day.diner, key));
+  mealList.appendChild(
+    renderMealCard("ontbijt", info.day.ontbijt, key, renderSwapPicker(info.weekNumber, info.week, info.dayIndex, "ontbijt"))
+  );
+  mealList.appendChild(
+    renderMealCard("lunch", info.day.lunch, key, renderSwapPicker(info.weekNumber, info.week, info.dayIndex, "lunch"))
+  );
+  mealList.appendChild(renderMealCard("snack", info.day.snack, key, null));
+  mealList.appendChild(
+    renderMealCard("diner", info.day.diner, key, renderSwapPicker(info.weekNumber, info.week, info.dayIndex, "diner"))
+  );
   container.appendChild(mealList);
 
   const resetRow = el("div", { class: "cycle-reset" }, [
